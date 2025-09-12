@@ -52,3 +52,6 @@ services:
       - "${PAPERLESS_DATA}/export:/usr/src/paperless/export"
     restart: unless-stopped
 
+  scanserver:
+    image: ghcr.io/nicogartmann/scanner-webui:main
+

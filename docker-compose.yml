@@ -54,6 +54,7 @@ services:
 
   scanserver:
     image: ghcr.io/nicogartmann/scanner-webui:main
+    network_mode: host
     ports:
       - "5000:5000"
 

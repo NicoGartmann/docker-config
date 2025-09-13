@@ -57,4 +57,6 @@ services:
     network_mode: host
     ports:
       - "5000:5000"
+    volumes:
+      - "${PAPERLESS_DATA}/consume:/app/scan"
 

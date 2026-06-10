@@ -3,7 +3,7 @@ version: "3.9"
 services:
 
   adguard:
-    image: adguard/adguardhome:latest
+    image: adguard/adguardhome:v0.107.77
     container_name: adguard
     volumes:
       - "${ADGUARD_CONFIG}/work:/opt/adguardhome/work"
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   paperless:
-    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
     container_name: paperless
     depends_on:
       - paperless-redis
@@ -62,7 +62,7 @@ services:
       - "${PAPERLESS_DATA}/consume:/app/scan"
 
   twingate-connector:
-    image: twingate/connector:1
+    image: twingate/connector:1.89.0
     container_name: twingate-connector
     restart: unless-stopped
     environment:

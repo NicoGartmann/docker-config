@@ -12,7 +12,7 @@ services:
       - "53:53/tcp"
       - "53:53/udp"
       - "3000:3000/tcp"   # Setup-WebUI
-      - "80:80/tcp"       # HTTP-DNS-Server
+      - "8080:80/tcp"     # HTTP-DNS-Server
     restart: unless-stopped
 
   paperless-redis:
@@ -60,6 +60,18 @@ services:
       - "5000:5000"
     volumes:
       - "${PAPERLESS_DATA}/consume:/app/scan"
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:2
+    container_name: nginx-proxy-manager
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"       # Admin UI
+    volumes:
+      - "${NPM_DATA}/data:/data"
+      - "${NPM_DATA}/letsencrypt:/etc/letsencrypt"
+    restart: unless-stopped
 
   twingate-connector:
     image: twingate/connector:1.89.0

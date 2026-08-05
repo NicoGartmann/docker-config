@@ -73,6 +73,22 @@ services:
       - "${NPM_DATA}/letsencrypt:/etc/letsencrypt"
     restart: unless-stopped
 
+  samba:
+    image: ghcr.io/servercontainers/samba:smbd-only-a3.17.3-s4.16.10-r0
+    container_name: samba
+    restart: unless-stopped
+    ports:
+      - "139:139"
+      - "445:445"
+    environment:
+      ACCOUNT_nas: ${SAMBA_PASSWORD}
+      UID_nas: "1000"
+      GROUP_nas: "1000"
+      GROUPS_nas: nas
+      SAMBA_VOLUME_CONFIG_nas: "[nas]; path = /shares/nas; valid users = nas; guest ok = no; read only = no"
+    volumes:
+      - "${SAMBA_DATA}:/shares/nas"
+
   twingate-connector:
     image: twingate/connector:1.89.0
     container_name: twingate-connector

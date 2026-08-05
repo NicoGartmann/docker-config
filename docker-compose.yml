@@ -51,6 +51,36 @@ services:
       - "${PAPERLESS_DATA}/consume:/usr/src/paperless/consume"
       - "${PAPERLESS_DATA}/export:/usr/src/paperless/export"
     restart: unless-stopped
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.paperless-export.schedule: "0 30 2 * * *"
+      ofelia.job-exec.paperless-export.command: "document_exporter ../export -d --no-progress-bar"
+
+  backup-sync:
+    image: rclone/rclone:1.68
+    container_name: backup-sync
+    restart: unless-stopped
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - "${RCLONE_CONFIG}:/config/rclone"
+      - "${PAPERLESS_DATA}/export:/data/paperless-export:ro"
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.paperless-backup-sync.schedule: "0 0 3 * * *"
+      ofelia.job-exec.paperless-backup-sync.command: "rclone sync /data/paperless-export gdrive:paperless-backup --create-empty-src-dirs"
+
+  ofelia:
+    image: mcuadros/ofelia:0.3.13
+    container_name: ofelia
+    command: daemon --docker
+    depends_on:
+      - paperless
+      - backup-sync
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: unless-stopped
 
   scanserver:
     image: ghcr.io/nicogartmann/scanner-webui:main

@@ -83,8 +83,8 @@ services:
     environment:
       ACCOUNT_nas: ${SAMBA_PASSWORD}
       UID_nas: "1000"
-      GROUP_nas: "1000"
-      GROUPS_nas: nas
+      GROUP_nasgrp: "2000"
+      GROUPS_nas: nasgrp
       SAMBA_VOLUME_CONFIG_nas: "[nas]; path = /shares/nas; valid users = nas; guest ok = no; read only = no"
     volumes:
       - "${SAMBA_DATA}:/shares/nas"

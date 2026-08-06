@@ -51,10 +51,6 @@ services:
       - "${PAPERLESS_DATA}/consume:/usr/src/paperless/consume"
       - "${PAPERLESS_DATA}/export:/usr/src/paperless/export"
     restart: unless-stopped
-    labels:
-      ofelia.enabled: "true"
-      ofelia.job-exec.paperless-export.schedule: "0 30 2 * * *"
-      ofelia.job-exec.paperless-export.command: "document_exporter ../export -d --no-progress-bar"
 
   backup-sync:
     image: rclone/rclone:1.68
@@ -66,10 +62,6 @@ services:
     volumes:
       - "${RCLONE_CONFIG}:/config/rclone"
       - "${PAPERLESS_DATA}/export:/data/paperless-export:ro"
-    labels:
-      ofelia.enabled: "true"
-      ofelia.job-exec.paperless-backup-sync.schedule: "0 0 3 * * *"
-      ofelia.job-exec.paperless-backup-sync.command: "rclone sync /data/paperless-export gdrive:paperless-backup --create-empty-src-dirs"
 
   ofelia:
     image: mcuadros/ofelia:0.3.13
@@ -81,6 +73,13 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     restart: unless-stopped
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-run.paperless-backup.schedule: "0 30 2 * * *"
+      ofelia.job-run.paperless-backup.image: "docker:27-cli"
+      ofelia.job-run.paperless-backup.entrypoint: "/bin/sh -c"
+      ofelia.job-run.paperless-backup.volume: "/var/run/docker.sock:/var/run/docker.sock"
+      ofelia.job-run.paperless-backup.command: "docker exec paperless document_exporter ../export -d --no-progress-bar && docker exec backup-sync rclone sync /data/paperless-export gdrive:paperless-backup --create-empty-src-dirs --transfers 2"
 
   scanserver:
     image: ghcr.io/nicogartmann/scanner-webui:main

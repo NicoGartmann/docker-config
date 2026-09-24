@@ -73,6 +73,21 @@ services:
       - "${NPM_DATA}/letsencrypt:/etc/letsencrypt"
     restart: unless-stopped
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8081:8080"     # Adguard already uses 8080, cAdvisor moves to 8081
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    devices:
+      - "/dev/kmsg"
+
   twingate-connector:
     image: twingate/connector:1.89.0
     container_name: twingate-connector

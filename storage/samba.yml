@@ -1,0 +1,18 @@
+name: samba
+
+services:
+  samba:
+    image: ghcr.io/servercontainers/samba:smbd-only-a3.24.1-s4.23.8-r0
+    container_name: samba
+    restart: unless-stopped
+    ports:
+      - "139:139"
+      - "445:445"
+    environment:
+      ACCOUNT_nas: ${SAMBA_PASSWORD}
+      UID_nas: "1000"
+      GROUP_nasgrp: "2000"
+      GROUPS_nas: nasgrp
+      SAMBA_VOLUME_CONFIG_nas: "[nas]; path = /shares/nas; valid users = nas; guest ok = no; read only = no"
+    volumes:
+      - "${SAMBA_DATA:-/mnt/drive/nas}:/shares/nas"

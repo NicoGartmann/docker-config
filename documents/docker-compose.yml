@@ -1,0 +1,50 @@
+name: documents
+
+services:
+  paperless-redis:
+    image: redis:7
+    container_name: paperless-redis
+    restart: unless-stopped
+
+  paperless-db:
+    image: postgres:15
+    container_name: paperless-db
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD:-paperless}
+    volumes:
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/pgdata:/var/lib/postgresql/data"
+    restart: unless-stopped
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+    container_name: paperless
+    depends_on:
+      - paperless-redis
+      - paperless-db
+    ports:
+      - "8000:8000"
+    environment:
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASSWORD:-paperless}
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_TIME_ZONE: Europe/Berlin
+      PAPERLESS_OCR_LANGUAGE: deu+eng
+    volumes:
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/data:/usr/src/paperless/data"
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/media:/usr/src/paperless/media"
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/consume:/usr/src/paperless/consume"
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/export:/usr/src/paperless/export"
+    restart: unless-stopped
+
+  scanserver:
+    image: ghcr.io/nicogartmann/scanner-webui:main
+    container_name: scanserver
+    pull_policy: always
+    network_mode: host # Lauscht direkt auf Host-Port 5000
+    volumes:
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/consume:/app/scan"
+    restart: unless-stopped

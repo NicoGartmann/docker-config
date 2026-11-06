@@ -40,7 +40,7 @@ flowchart TD
     end
 
     H_RPI --> C_ADG & C_PRX & C_TWI & D_DOC & S_SMB & MON_AGT
-    H_PAR --> C_ADG & M_MED & S_SMB & MON_AGT
+    H_PAR --> C_ADG & C_PRX & C_TWI & M_MED & S_SMB & MON_AGT
     H_VPS --> C_TWI & MON_SRV
 ```
 
@@ -54,17 +54,17 @@ flowchart TD
 ├── docs/
 │   └── SUP-146 Docker Konfig: die Repos docker-config und docker-conf zusammenführen und restrukturieren.md
 ├── connectivity/
-│   ├── adguard.yml                          # AdGuard Home (DNS & WebUI)
-│   ├── proxy.yml                            # Nginx Proxy Manager (Reverse Proxy)
-│   └── twingate.yml                         # Twingate Connector (Zero-Trust VPN)
+│   ├── adguard.yml                          # AdGuard Home (DNS & WebUI) – für raspberrypi & parents_pi
+│   ├── proxy.yml                            # Nginx Proxy Manager (Reverse Proxy) – für raspberrypi & parents_pi
+│   └── twingate.yml                         # Twingate Connector (Zero-Trust VPN) – zwingend auf ALLEN Hosts
 ├── documents/
-│   └── docker-compose.yml                   # Paperless-ngx + PostgreSQL + Redis + Scanserver
+│   └── docker-compose.yml                   # Paperless-ngx + PostgreSQL + Redis + Scanserver – für raspberrypi
 ├── media/
-│   └── docker-compose.yml                   # Plex Media Server + Overseerr
+│   └── docker-compose.yml                   # Plex Media Server + Overseerr – für parents_pi
 ├── storage/
-│   └── samba.yml                            # Samba Server (servercontainers/samba)
+│   └── samba.yml                            # Samba Server (servercontainers/samba) – für raspberrypi & parents_pi
 └── monitoring/
-    └── agent.yml                            # cAdvisor (Container-Metriken für Prometheus)
+    └── agent.yml                            # cAdvisor (Container-Metriken) – für raspberrypi & parents_pi
 ```
 
 > [!IMPORTANT]
@@ -81,17 +81,20 @@ flowchart TD
    * Künftig steht `.env` in `.gitignore`. Im Repository liegt stattdessen eine dokumentierte `.env.example`.
 2. **Fallbacks (`${VAR:-default}`) direkt in den Compose-Dateien**:
    * Alle Standard-Verzeichnispfade unter `/opt/...` und `/mnt/...` werden mit Default-Werten versehen (z. B. `${ADGUARD_CONFIG:-/opt/adguard}`).
-   * Nur echte Secrets (wie `${TWINGATE_ACCESS_TOKEN}` oder `${SAMBA_PASSWORD}`) verwenden Pflicht-Syntax (`${VAR:?error}`) bzw. werden über `/opt/services/.env` aus dem Ansible-Vault injiziert.
+   * Nur echte Secrets (wie `${TWINGATE_ACCESS_TOKEN}` oder `${SAMBA_PASSWORD}`) werden ohne Default aus `/opt/services/.env` (befüllt über den jeweiligen Host-Vault in `raspi-ansible`) injiziert.
 3. **Zentrale `/opt/services/.env` für alle Unterordner**:
    * Da Docker Compose standardmäßig im jeweiligen Unterordner nach einer `.env` sucht, übergibt `raspi-ansible` beim Aufruf `--env-file /opt/services/.env`.
 
-### 2.2 Konfigurationspfade einheitlich unter `/opt/<service>`
-* Alle Container-Konfigurationen liegen künftig auf beiden Pis einheitlich außerhalb des Git-Repositories unter `/opt/<service>` (z. B. `/opt/adguard`, `/opt/nginx-proxy-manager`, `/opt/plex`, `/opt/overseerr`).
-* Die bisherigen relativen Ordner mit `.gitkeep` aus `docker-conf` (`./adguard`, `./plex`, `./overseerr`) entfallen komplett.
-* **Wichtig für `parents_pi`**: Die produktiven Medien-Pfade (`/mnt/mediahdd/Serien`, `/mnt/mediahdd/Filme`, `/mnt/oldhdd/Bilder`) bleiben **unverändert** erhalten!
+### 2.2 Schutz produktiver Bestandsdaten & Konfigurationspfade unter `/opt/<service>`
+* **Oberste Priorität – Kein Datenverlust bei Bestandsdaten**:
+  * Auf **`raspberrypi`** ist Paperless-ngx unter `/mnt/drive/paperless` (`pgdata`, `data`, `media`, `consume`, `export`) bereits produktiv in Benutzung. Dieser Pfad (`PAPERLESS_DATA=/mnt/drive/paperless`) sowie das interne DB-Passwort (`paperless`) bleiben **100 % unverändert**.
+  * Auf **`parents_pi`** ist Plex mit den Medien-Pfaden (`/mnt/mediahdd/Serien`, `/mnt/mediahdd/Filme`, `/mnt/oldhdd/Bilder`) produktiv in Benutzung. Auch diese Pfade bleiben **100 % unverändert**.
+* **Einheitliche App-Configs unter `/opt/<service>`**:
+  * Alle Container-Konfigurationen liegen künftig auf beiden Pis einheitlich außerhalb des Git-Repositories unter `/opt/<service>` (`/opt/adguard`, `/opt/nginx-proxy-manager`, `/opt/plex`, `/opt/overseerr`).
+  * Die bisherigen relativen Ordner mit `.gitkeep` aus `docker-conf` (`./adguard`, `./plex`, `./overseerr`) entfallen komplett.
 
-### 2.3 Gepinnte Image-Versionen
-* Alle Docker-Images (inklusive `plex` und `overseerr`, die in `docker-conf` bisher auf `:latest` standen) werden auf konkrete, reproduzierbare Versionen gepinnt.
+### 2.3 Gepinnte, stabile Release-Versionen
+* Alle Docker-Images werden ausschließlich auf **offizielle, stabile Release-Versionen** gepinnt (keine `:latest`-Tags für Apps und keine Release-Candidates/Pre-Releases).
 * Versions-Upgrades erfolgen kontrolliert über Git-Commits im `docker-config`-Repository und anschließendes Ausführen von `ansible-playbook playbooks/update.yml`.
 
 ---
@@ -100,11 +103,12 @@ flowchart TD
 
 ### 3.1 `connectivity/adguard.yml`
 Vereinheitlicht die bisherigen Abweichungen zwischen `raspberrypi` (Bridge-Netzwerk) und `parents_pi` (`network_mode: host`):
-* **Netzwerk**: Sauberer Bridge-Modus auf beiden Pis.
+* **Einsatzort**: `raspberrypi`, `parents_pi`
+* **Netzwerk**: Sauberer Bridge-Modus auf beiden Pis (da auf beiden Pis auch Nginx Proxy Manager auf Port 80/443 laufen kann).
 * **Ports**:
   * `53:53/tcp` & `53:53/udp` (DNS)
   * `3000:3000/tcp` (Initiales Setup-WebUI)
-  * `${ADGUARD_WEB_PORT:-8080}:80/tcp` (WebUI – Default `8080`, über `.env` pro Host steuerbar)
+  * `${ADGUARD_WEB_PORT:-8080}:80/tcp` (WebUI – Default `8080`, kollisionsfrei mit Nginx Proxy Manager)
 * **Volumes**:
   * `${ADGUARD_CONFIG:-/opt/adguard}/work:/opt/adguardhome/work`
   * `${ADGUARD_CONFIG:-/opt/adguard}/conf:/opt/adguardhome/conf`
@@ -129,8 +133,8 @@ services:
 ```
 
 ### 3.2 `connectivity/proxy.yml`
-* **Einsatzort**: `raspberrypi`
-* **Image**: `jc21/nginx-proxy-manager:2.16.0` (gepinnt von `:2`)
+* **Einsatzort**: `raspberrypi`, `parents_pi`
+* **Image**: `jc21/nginx-proxy-manager:2.16.0` (gepinnt auf stabiles Release statt `:2`)
 * **Volumes**:
   * `${NPM_DATA:-/opt/nginx-proxy-manager}/data:/data`
   * `${NPM_DATA:-/opt/nginx-proxy-manager}/letsencrypt:/etc/letsencrypt`
@@ -153,9 +157,9 @@ services:
 ```
 
 ### 3.3 `connectivity/twingate.yml`
-* **Einsatzort**: `raspberrypi`, künftig auch `strato_vps` (und bei Bedarf `parents_pi`)
-* **Image**: `twingate/connector:1.89.0`
-* **Umgebungsvariablen** (aus `/opt/services/.env` via Ansible-Vault):
+* **Einsatzort**: **Zwingend auf allen Systemen** (`raspberrypi`, `parents_pi`, `strato_vps`), um den Remote-Zugriff auf jedes Gerät im Twingate-Netzwerk sicherzustellen.
+* **Image**: `twingate/connector:1.95.0` (aktuelles stabiles Release, das bereits auf `parents_pi` im Einsatz ist; Hinweis: auf Docker Hub lautet der offizielle Tag `1.95.0` ohne führendes `v`).
+* **Umgebungsvariablen** (aus `/opt/services/.env`, gespeist aus dem jeweiligen Host-spezifischen Ansible-Vault `vaults/<hostname>.yml`, da jeder Connector eigene Access-/Refresh-Tokens besitzt):
   * `TWINGATE_NETWORK`
   * `TWINGATE_ACCESS_TOKEN`
   * `TWINGATE_REFRESH_TOKEN`
@@ -165,7 +169,7 @@ name: twingate
 
 services:
   twingate-connector:
-    image: twingate/connector:1.89.0
+    image: twingate/connector:1.95.0
     container_name: twingate-connector
     restart: unless-stopped
     environment:
@@ -179,7 +183,11 @@ services:
 ### 3.4 `documents/docker-compose.yml`
 * **Einsatzort**: `raspberrypi`
 * **Enthaltene Services**: `paperless-redis` (`redis:7`), `paperless-db` (`postgres:15`), `paperless` (`ghcr.io/paperless-ngx/paperless-ngx:2.20.15`), `scanserver` (`ghcr.io/nicogartmann/scanner-webui:main`)
-* **Volumes**: Nutzt `${PAPERLESS_DATA:-/mnt/drive/paperless}` für DB, Data, Media, Consume und Export.
+* **Volumes**: Nutzt `${PAPERLESS_DATA:-/mnt/drive/paperless}` für `pgdata`, `data`, `media`, `consume` und `export`.
+
+> [!CAUTION]
+> **Produktivdaten-Schutz für Paperless-ngx (`/mnt/drive/paperless`)**
+> Paperless-ngx ist auf `raspberrypi` aktiv in Benutzung. Alle Host-Mount-Pfade unter `/mnt/drive/paperless/{pgdata,data,media,consume,export}` sowie die Datenbank-Zugangsdaten (`paperless`) bleiben exakt identisch zum bisherigen Stand. Da sämtliche Verzeichnisse als Host-Bind-Mounts auf der externen Festplatte `/mnt/drive` liegen, bleiben beim Stoppen des alten Containers und Starten des neuen `documents`-Stacks alle Dokumente, Suchindizes und Datenbank-Inhalte vollständig erhalten.
 
 ```yaml
 name: documents
@@ -283,18 +291,26 @@ services:
 
 ### 3.6 `storage/samba.yml`
 Ablösung des veralteten `dperson/samba`-Containers aus `docker-conf` durch die moderne, einheitliche `servercontainers/samba`-Konfiguration für beide Pis:
-* **Einsatzort**: Optional/aktivierbar auf `raspberrypi` und `parents_pi`
-* **Image**: `ghcr.io/servercontainers/samba:smbd-only-a3.17.3-s4.16.10-r0`
+* **Einsatzort**: `raspberrypi`, `parents_pi`
+* **Image**: `ghcr.io/servercontainers/samba:smbd-only-a3.24.1-s4.23.8-r0`
+
+> [!NOTE]
+> **Hintergrund zum Tag-Schema von `servercontainers/samba`**
+> Das Suffix `-r0` ist bei diesem Image **kein** Release-Candidate (`-rc`), sondern das offizielle stabile Paket-Schema von Alpine Linux:
+> * `a3.24.1` = Alpine Linux `3.24.1` (Stable)
+> * `s4.23.8` = Samba `4.23.8` (Stable)
+> * `r0` = Alpine APK Package Revision `0` (regulärer stabiler Paket-Build)
+
 * **Steuerung über `.env`**:
-  * `SAMBA_DATA`: Freizugebender Host-Pfad (auf `raspberrypi` z. B. `/mnt/drive/nas`, auf `parents_pi` `/mnt`)
-  * `SAMBA_PASSWORD`: Passwort für den Samba-User `nas` aus dem jeweiligen Host-Vault
+  * `SAMBA_DATA`: Freizugebender Host-Pfad (auf `raspberrypi` `/mnt/drive/nas`, auf `parents_pi` `/mnt`)
+  * `SAMBA_PASSWORD`: Passwort für den Samba-User `nas` aus dem jeweiligen Host-Vault (`vaults/<hostname>.yml`)
 
 ```yaml
 name: samba
 
 services:
   samba:
-    image: ghcr.io/servercontainers/samba:smbd-only-a3.17.3-s4.16.10-r0
+    image: ghcr.io/servercontainers/samba:smbd-only-a3.24.1-s4.23.8-r0
     container_name: samba
     restart: unless-stopped
     ports:
@@ -337,16 +353,23 @@ services:
 
 ---
 
-## 4. Umsetzungsplan (Schritte im Branch `feature/SUP-146`)
+## 4. Umsetzungsplan & Geplante Zwischen-Commits (Branch `feature/SUP-146`)
 
-1. **Schritt 1 – Zusammenführung (Import des IST-Stands aus `docker-conf`)**:
-   * Übernahme der `docker-conf`-Services (`plex`, `overseerr`, `samba`, `adguard`) in das `docker-config`-Repository als nachvollziehbarer Zwischenschritt, ohne die alte Git-Commit-Historie von `docker-conf` zu mergen.
-2. **Schritt 2 – Restrukturierung & Vereinheitlichung in die 5 Themen-Ordner**:
-   * Anlegen von `connectivity/{adguard,proxy,twingate}.yml`, `documents/docker-compose.yml`, `media/docker-compose.yml`, `storage/samba.yml` und `monitoring/agent.yml`.
-   * Entfernen der monolithischen Root-`docker-compose.yml`.
-   * Entfernen von `.env` aus dem Git-Index (`git rm --cached .env`), Aufnahme von `.env` in `.gitignore` und Erstellen einer dokumentierten `.env.example`.
-   * Erstellen einer übersichtlichen `README.md` für `docker-config`.
-3. **Schritt 3 – Ansible-Abgleich & Migration auf den Pis**:
-   * Alle notwendigen Anpassungen im `raspi-ansible`-Projekt sowie die Schritt-für-Schritt-Migrationscheckliste für `parents_pi` (Umzug der App-Configs von `/home/pi/docker-conf/...` nach `/opt/...`) sind im Begleitdokument [`raspi-ansible/docs/SUP-146.md`](../../raspi-ansible/docs/SUP-146.md) festgehalten.
-4. **Schritt 4 – Abschluss**:
-   * Nach erfolgreichem Rollout auf `raspberrypi` und `parents_pi` wird das alte Repository `docker-conf` auf GitHub archiviert.
+Bei der Umsetzung arbeiten wir mit kleinteiligen, logisch getrennten Zwischen-Commits nach Conventional Commits:
+
+1. **Commit 1 – Design-Dokument finalisieren**:
+   * `docs(SUP-146): update design document with review feedback`
+2. **Commit 2 – IST-Stand aus `docker-conf` übernehmen (Zusammenführung)**:
+   * `feat(SUP-146): import services from docker-conf repository`
+   * Übernimmt zunächst die bisherigen Services aus `docker-conf` (`plex`, `overseerr`, `samba`), damit die Zusammenführung in der Git-Historie von `docker-config` sauber nachvollziehbar ist.
+3. **Commit 3 – Aufteilung in die 5 Themen-Ordner & Vereinheitlichung**:
+   * `refactor(SUP-146): split monolithic compose into thematic stacks and pin versions`
+   * Erstellt `connectivity/{adguard,proxy,twingate}.yml`, `documents/docker-compose.yml`, `media/docker-compose.yml`, `storage/samba.yml` und `monitoring/agent.yml` und entfernt die monolithische Root-`docker-compose.yml`.
+4. **Commit 4 – `.env`-Bereinigung & `.env.example`**:
+   * `chore(SUP-146): untrack .env, update .gitignore and add .env.example`
+   * Entfernt `.env` aus dem Git-Tracking (`git rm --cached .env`), ergänzt `.env` in `.gitignore` und legt `.env.example` an.
+5. **Commit 5 – Dokumentation (`README.md`)**:
+   * `docs(SUP-146): add README with stack overview and environment variables`
+6. **Anschließend – Ansible-Abgleich & Migration**:
+   * Die gekoppelten Anpassungen im `raspi-ansible`-Repository sowie die Schritt-für-Schritt-Migrationsanleitung für `raspberrypi` und `parents_pi` sind unter [`https://github.com/NicoGartmann/raspi-ansible/blob/main/docs/SUP-146.md`](https://github.com/NicoGartmann/raspi-ansible/blob/main/docs/SUP-146.md) dokumentiert.
+   * Nach erfolgreichem Rollout wird das alte Repository `docker-conf` auf GitHub archiviert.

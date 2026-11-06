@@ -98,3 +98,45 @@ services:
       TWINGATE_REFRESH_TOKEN: ${TWINGATE_REFRESH_TOKEN}
     sysctls:
       net.ipv4.ping_group_range: "0 2147483647"
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    volumes:
+      - ./overseerr/config:/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - VERSION=docker
+      - PLEX_CLAIM= #optional
+    volumes:
+      - ./plex/config:/config
+      - /mnt/mediahdd/Serien:/tv
+      - /mnt/mediahdd/Filme:/movies
+      - /mnt/oldhdd/Bilder:/pictures
+    restart: unless-stopped
+
+  samba:
+    image: dperson/samba
+    container_name: samba
+    restart: unless-stopped
+    ports:
+      - 139:139
+      - 445:445
+    volumes:
+      - /mnt:/mount # Replace with the path to your external drive
+    environment:
+      - USER=samba # Replace 'username' with your desired Samba username
+      - PASSWORD=samba # Replace 'password' with your desired Samba password

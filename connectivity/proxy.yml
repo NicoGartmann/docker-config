@@ -12,3 +12,7 @@ services:
       - "${NPM_DATA:-/opt/nginx-proxy-manager}/data:/data"
       - "${NPM_DATA:-/opt/nginx-proxy-manager}/letsencrypt:/etc/letsencrypt"
     restart: unless-stopped
+
+networks:
+  default:
+    name: proxy-net

@@ -1,0 +1,87 @@
+// =============================================================================
+// Grafana Alloy Agent-Konfiguration (für raspberrypi & parents_pi)
+// =============================================================================
+
+// 1. Integrierter Node Exporter (Host-Ressourcen, Mountpoints, Dateisysteme & I/O)
+prometheus.exporter.unix "host" {
+  rootfs_path = "/rootfs"
+  sysfs_path  = "/sys"
+  procfs_path = "/host/proc"
+
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($|/)"
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+  }
+}
+
+// 2. Integrierter cAdvisor (Docker Container Status & Ressourcen)
+prometheus.exporter.cadvisor "docker" {
+  docker_host            = "unix:///var/run/docker.sock"
+  docker_only            = true
+  store_container_labels = true
+}
+
+// 3. Scrape: Host + Docker alle 30 Sekunden
+prometheus.scrape "local_metrics" {
+  targets = array.concat(
+    prometheus.exporter.unix.host.targets,
+    prometheus.exporter.cadvisor.docker.targets,
+  )
+  scrape_interval = "30s"
+  forward_to      = [prometheus.relabel.normalize.receiver]
+}
+
+// 4. Scrape: S.M.A.R.T. Exporter Sidecar-Container
+prometheus.scrape "smartctl" {
+  targets = [{
+    __address__ = "smartctl-exporter:9633",
+    job         = "integrations/smartctl",
+  }]
+  scrape_interval = "60s"
+  forward_to      = [prometheus.relabel.normalize.receiver]
+}
+
+// 5. Normalisierung der Container-Namen (für cgroup v1 & v2 Kompatibilität)
+prometheus.relabel "normalize" {
+  forward_to = [prometheus.remote_write.strato_vps.receiver]
+
+  // Führenden Slash bei Container-Namen entfernen (z. B. "/adguard" -> "adguard")
+  rule {
+    source_labels = ["name"]
+    regex         = "^/?(.+)$"
+    target_label  = "name"
+    replacement   = "$1"
+  }
+
+  // Fallback auf Docker Compose Service-Name (falls cgroups v2 'name' leer lässt)
+  rule {
+    source_labels = ["name", "container_label_com_docker_compose_service"]
+    regex         = "^$;(.+)$"
+    target_label  = "name"
+    replacement   = "$1"
+  }
+}
+
+// 6. Push an Strato VPS (inkl. lokalem Write-Ahead-Log unter /var/lib/alloy/data)
+prometheus.remote_write "strato_vps" {
+  endpoint {
+    url = sys.env("PROMETHEUS_REMOTE_WRITE_URL")
+
+    basic_auth {
+      username = sys.env("PROMETHEUS_REMOTE_WRITE_USER")
+      password = sys.env("PROMETHEUS_REMOTE_WRITE_PASSWORD")
+    }
+
+    queue_config {
+      capacity          = 2500
+      max_shards        = 2
+      min_backoff       = "5s"
+      max_backoff       = "5m"
+      retry_on_http_429 = true
+    }
+  }
+
+  external_labels = {
+    host = sys.env("HOSTNAME"),
+  }
+}

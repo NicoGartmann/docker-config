@@ -47,6 +47,7 @@ services:
     image: grafana/alloy:v1.7.1
     container_name: alloy
     restart: unless-stopped
+    cgroup: host
     command:
       - "run"
       - "--storage.path=/var/lib/alloy/data"
@@ -59,6 +60,7 @@ services:
       - "/:/rootfs:ro,rslave"
       - "/var/run:/var/run:ro"
       - "/sys:/sys:ro"
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
       - "/proc:/host/proc:ro"
       - "/run/udev/data:/run/udev/data:ro"
       - "/var/lib/docker:/var/lib/docker:ro"

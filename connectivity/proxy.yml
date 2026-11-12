@@ -7,7 +7,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "81:81"       # Admin UI
+      - "${NPM_ADMIN_PORT:-81:81}"       # Admin UI (auf strato_vps: 127.0.0.1:81:81)
     volumes:
       - "${NPM_DATA:-/opt/nginx-proxy-manager}/data:/data"
       - "${NPM_DATA:-/opt/nginx-proxy-manager}/letsencrypt:/etc/letsencrypt"

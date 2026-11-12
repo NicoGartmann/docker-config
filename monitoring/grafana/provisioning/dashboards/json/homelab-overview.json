@@ -77,7 +77,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max by (host) (up{job=\"integrations/unix\"})",
+          "expr": "max by (host) (max_over_time(up{job=\"integrations/unix\"}[2m]))",
+          "instant": true,
           "legendFormat": "{{host}}",
           "refId": "A"
         }
@@ -339,7 +340,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count by (host, name) (container_last_seen{host=~\"$host\", name!=\"\"})",
+          "expr": "count by (host, name) (last_over_time(container_last_seen{host=~\"$host\", name!=\"\"}[2m]))",
+          "instant": true,
           "legendFormat": "{{host}}: {{name}}",
           "refId": "A"
         }

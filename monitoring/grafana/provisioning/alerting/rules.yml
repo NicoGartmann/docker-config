@@ -12,7 +12,7 @@ groups:
       - uid: host_offline
         title: Host nicht erreichbar (Offline)
         condition: C
-        for: 3m
+        for: 0m
         noDataState: OK
         execErrState: Error
         labels:
@@ -29,9 +29,9 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                absent(up{host="raspberrypi", job="integrations/unix"}) or
-                absent(up{host="parents_pi", job="integrations/unix"}) or
-                absent(up{host="strato_vps", job="integrations/unix"})
+                absent_over_time(up{host="raspberrypi", job="integrations/unix"}[3m]) or
+                absent_over_time(up{host="parents_pi", job="integrations/unix"}[3m]) or
+                absent_over_time(up{host="strato_vps", job="integrations/unix"}[3m])
               instant: true
               refId: A
           - refId: B
@@ -69,7 +69,7 @@ groups:
       - uid: drive_not_mounted
         title: Externe Festplatte nicht gemountet (nofail-Schutz)
         condition: C
-        for: 2m
+        for: 0m
         noDataState: OK
         execErrState: Error
         labels:
@@ -87,11 +87,11 @@ groups:
             model:
               expr: |
                 (
-                  absent(node_filesystem_size_bytes{host="raspberrypi", mountpoint="/mnt/drive"}) or
-                  absent(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/mediahdd"}) or
-                  absent(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/oldhdd"})
+                  absent_over_time(node_filesystem_size_bytes{host="raspberrypi", mountpoint="/mnt/drive"}[2m]) or
+                  absent_over_time(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/mediahdd"}[2m]) or
+                  absent_over_time(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/oldhdd"}[2m])
                 )
-                and on(host) (max by(host) (up{job="integrations/unix"}) == 1)
+                and on(host) (max by(host) (last_over_time(up{job="integrations/unix"}[2m])) == 1)
               instant: true
               refId: A
           - refId: B
@@ -312,8 +312,8 @@ groups:
               expression: B
               conditions:
                 - evaluator:
-                    type: within_range
-                    params: [85, 95]
+                    type: gt
+                    params: [85]
               refId: C
 
       - uid: disk_space_critical
@@ -376,7 +376,7 @@ groups:
       - uid: docker_container_down
         title: Docker-Dienst läuft nicht
         condition: C
-        for: 3m
+        for: 1m
         noDataState: OK
         execErrState: Error
         labels:
@@ -394,30 +394,30 @@ groups:
             model:
               expr: |
                 (
-                  absent(container_last_seen{host="raspberrypi", name="adguard"}) or
-                  absent(container_last_seen{host="raspberrypi", name="nginx-proxy-manager"}) or
-                  absent(container_last_seen{host="raspberrypi", name="twingate-connector"}) or
-                  absent(container_last_seen{host="raspberrypi", name="paperless"}) or
-                  absent(container_last_seen{host="raspberrypi", name="paperless-db"}) or
-                  absent(container_last_seen{host="raspberrypi", name="paperless-redis"}) or
-                  absent(container_last_seen{host="raspberrypi", name="scanserver"}) or
-                  absent(container_last_seen{host="raspberrypi", name="samba"}) or
-                  absent(container_last_seen{host="raspberrypi", name="alloy"}) or
-                  absent(container_last_seen{host="raspberrypi", name="smartctl-exporter"}) or
-                  absent(container_last_seen{host="parents_pi", name="adguard"}) or
-                  absent(container_last_seen{host="parents_pi", name="nginx-proxy-manager"}) or
-                  absent(container_last_seen{host="parents_pi", name="twingate-connector"}) or
-                  absent(container_last_seen{host="parents_pi", name="plex"}) or
-                  absent(container_last_seen{host="parents_pi", name="overseerr"}) or
-                  absent(container_last_seen{host="parents_pi", name="samba"}) or
-                  absent(container_last_seen{host="parents_pi", name="alloy"}) or
-                  absent(container_last_seen{host="parents_pi", name="smartctl-exporter"}) or
-                  absent(container_last_seen{host="strato_vps", name="nginx-proxy-manager"}) or
-                  absent(container_last_seen{host="strato_vps", name="prometheus"}) or
-                  absent(container_last_seen{host="strato_vps", name="grafana"}) or
-                  absent(container_last_seen{host="strato_vps", name="alloy"})
+                  absent_over_time(container_last_seen{host="raspberrypi", name="adguard"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="twingate-connector"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless-db"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless-redis"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="scanserver"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="samba"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="alloy"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="smartctl-exporter"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="adguard"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="twingate-connector"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="plex"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="overseerr"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="samba"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="alloy"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="smartctl-exporter"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="prometheus"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="grafana"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="alloy"}[2m])
                 )
-                and on(host) (max by(host) (up{job="integrations/unix"}) == 1)
+                and on(host) (max by(host) (last_over_time(up{job="integrations/unix"}[2m])) == 1)
               instant: true
               refId: A
           - refId: B

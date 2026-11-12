@@ -19,7 +19,7 @@ services:
       - "${PROMETHEUS_DATA:-/opt/prometheus}:/prometheus"
     networks:
       - default
-      - proxy-net
+      - proxy_default
 
   grafana:
     image: grafana/grafana:11.5.2
@@ -41,7 +41,7 @@ services:
       - "./grafana/provisioning:/etc/grafana/provisioning:ro"
     networks:
       - default
-      - proxy-net
+      - proxy_default
 
   alloy:
     image: grafana/alloy:v1.7.1
@@ -71,5 +71,5 @@ services:
       - prometheus
 
 networks:
-  proxy-net:
+  proxy_default:
     external: true

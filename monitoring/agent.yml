@@ -2,7 +2,7 @@ name: monitoring-agent
 
 services:
   smartctl-exporter:
-    image: prometheuscommunity/smartctl-exporter:v0.13.0
+    image: prometheuscommunity/smartctl-exporter:v0.15.0
     container_name: smartctl-exporter
     restart: unless-stopped
     privileged: true

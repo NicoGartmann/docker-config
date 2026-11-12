@@ -1,0 +1,64 @@
+// =============================================================================
+// Grafana Alloy Self-Monitoring-Konfiguration (für strato_vps)
+// =============================================================================
+
+// 1. Integrierter Node Exporter (Host-Ressourcen, Dateisystem & I/O des VPS)
+prometheus.exporter.unix "host" {
+  rootfs_path = "/rootfs"
+  sysfs_path  = "/sys"
+  procfs_path = "/host/proc"
+
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($|/)"
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+  }
+}
+
+// 2. Integrierter cAdvisor (Docker Container auf strato_vps)
+prometheus.exporter.cadvisor "docker" {
+  docker_host            = "unix:///var/run/docker.sock"
+  docker_only            = true
+  store_container_labels = true
+}
+
+// 3. Scrape: Host + Docker alle 30 Sekunden
+prometheus.scrape "local_metrics" {
+  targets = array.concat(
+    prometheus.exporter.unix.host.targets,
+    prometheus.exporter.cadvisor.docker.targets,
+  )
+  scrape_interval = "30s"
+  forward_to      = [prometheus.relabel.normalize.receiver]
+}
+
+// 4. Normalisierung der Container-Namen (für cgroup v1 & v2 Kompatibilität)
+prometheus.relabel "normalize" {
+  forward_to = [prometheus.remote_write.local_prometheus.receiver]
+
+  // Führenden Slash bei Container-Namen entfernen
+  rule {
+    source_labels = ["name"]
+    regex         = "^/?(.+)$"
+    target_label  = "name"
+    replacement   = "$1"
+  }
+
+  // Fallback auf Docker Compose Service-Name (falls cgroups v2 'name' leer lässt)
+  rule {
+    source_labels = ["name", "container_label_com_docker_compose_service"]
+    regex         = "^$;(.+)$"
+    target_label  = "name"
+    replacement   = "$1"
+  }
+}
+
+// 5. Interner Push an den lokalen Prometheus-Container im selben Compose-Netzwerk
+prometheus.remote_write "local_prometheus" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+
+  external_labels = {
+    host = sys.env("HOSTNAME"),
+  }
+}

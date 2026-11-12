@@ -1,0 +1,16 @@
+# =============================================================================
+# Prometheus Konfiguration (strato_vps)
+# Alle Metriken von raspberrypi, parents_pi und strato_vps werden aktiv per
+# Remote-Write Receiver (--web.enable-remote-write-receiver) von Grafana Alloy
+# an /api/v1/write gepusht.
+# =============================================================================
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          host: "strato_vps"

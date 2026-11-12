@@ -20,7 +20,14 @@ Zentrales Repository für alle Docker-Compose-Definitionen der Homelab- & VPS-In
 ├── storage/
 │   └── samba.yml                            # Samba Server (servercontainers/samba)
 └── monitoring/
-    └── agent.yml                            # cAdvisor (Container-Metriken)
+    ├── agent.yml                            # Grafana Alloy & smartctl-exporter (Push-Agent für Pis)
+    ├── server.yml                           # Prometheus, Grafana & Alloy Self-Monitoring (strato_vps)
+    ├── config-agent.alloy                   # Alloy Push-Konfiguration für raspberrypi & parents_pi
+    ├── config-server.alloy                  # Alloy Self-Monitoring-Konfiguration für strato_vps
+    ├── prometheus/
+    │   └── prometheus.yml                   # Prometheus-Konfiguration (Remote-Write Receiver)
+    └── grafana/
+        └── provisioning/                    # Datasources, Discord-Alerting & Dashboards als Code
 ```
 
 ---
@@ -30,12 +37,13 @@ Zentrales Repository für alle Docker-Compose-Definitionen der Homelab- & VPS-In
 | Compose-Datei | Enthaltene Services | `raspberrypi` | `parents_pi` | `strato_vps` |
 | :--- | :--- | :---: | :---: | :---: |
 | [`connectivity/adguard.yml`](./connectivity/adguard.yml) | `adguard` | ✅ | ✅ | – |
-| [`connectivity/proxy.yml`](./connectivity/proxy.yml) | `nginx-proxy-manager` | ✅ | ✅ | – |
-| [`connectivity/twingate.yml`](./connectivity/twingate.yml) | `twingate-connector` | ✅ | ✅ | ✅ |
+| [`connectivity/proxy.yml`](./connectivity/proxy.yml) | `nginx-proxy-manager` | ✅ | ✅ | ✅ |
+| [`connectivity/twingate.yml`](./connectivity/twingate.yml) | `twingate-connector` | ✅ | ✅ | – |
 | [`documents/docker-compose.yml`](./documents/docker-compose.yml) | `paperless`, `paperless-db`, `paperless-redis`, `scanserver` | ✅ | – | – |
 | [`media/docker-compose.yml`](./media/docker-compose.yml) | `plex`, `overseerr` | – | ✅ | – |
 | [`storage/samba.yml`](./storage/samba.yml) | `samba` | ✅ | ✅ | – |
-| [`monitoring/agent.yml`](./monitoring/agent.yml) | `cadvisor` | ✅ | ✅ | – |
+| [`monitoring/agent.yml`](./monitoring/agent.yml) | `alloy`, `smartctl-exporter` | ✅ | ✅ | – |
+| [`monitoring/server.yml`](./monitoring/server.yml) | `prometheus`, `grafana`, `alloy` | – | – | ✅ |
 
 ---
 

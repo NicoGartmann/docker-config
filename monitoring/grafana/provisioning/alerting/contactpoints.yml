@@ -1,0 +1,38 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord-raspberrypi
+    receivers:
+      - uid: discord_raspberrypi
+        type: discord
+        settings:
+          url: ${DISCORD_WEBHOOK_RASPBERRYPI}
+          use_discord_username: false
+          title: |
+            {{ if eq .Status "firing" }}🚨 [{{ .CommonLabels.category | toUpper }}] Problem auf {{ .CommonLabels.host }}{{ else }}✅ [{{ .CommonLabels.category | toUpper }}] Behoben auf {{ .CommonLabels.host }}{{ end }}
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: discord-parents-pi
+    receivers:
+      - uid: discord_parents_pi
+        type: discord
+        settings:
+          url: ${DISCORD_WEBHOOK_PARENTS_PI}
+          use_discord_username: false
+          title: |
+            {{ if eq .Status "firing" }}🚨 [{{ .CommonLabels.category | toUpper }}] Problem auf {{ .CommonLabels.host }}{{ else }}✅ [{{ .CommonLabels.category | toUpper }}] Behoben auf {{ .CommonLabels.host }}{{ end }}
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: discord-strato-vps
+    receivers:
+      - uid: discord_strato_vps
+        type: discord
+        settings:
+          url: ${DISCORD_WEBHOOK_STRATO_VPS}
+          use_discord_username: false
+          title: |
+            {{ if eq .Status "firing" }}🚨 [{{ .CommonLabels.category | toUpper }}] Problem auf {{ .CommonLabels.host }}{{ else }}✅ [{{ .CommonLabels.category | toUpper }}] Behoben auf {{ .CommonLabels.host }}{{ end }}
+        disableResolveMessage: false

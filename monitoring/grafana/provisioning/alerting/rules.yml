@@ -1,0 +1,500 @@
+apiVersion: 1
+
+groups:
+  # ===========================================================================
+  # 1. Verfügbarkeit (Availability)
+  # ===========================================================================
+  - orgId: 1
+    name: availability-checks
+    folder: Homelab Alerts
+    interval: 1m
+    rules:
+      - uid: host_offline
+        title: Host nicht erreichbar (Offline)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: availability
+          severity: critical
+        annotations:
+          summary: "🔴 Host {{ $labels.host }} sendet keine Metriken mehr!"
+          description: "Seit mindestens 3 Minuten sind keine Heartbeat-Metriken (up) von {{ $labels.host }} eingegangen. Mögliche Ursachen: Stromausfall, Netzwerk-/Internetstörung im Heimnetz oder Systemabsturz."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                absent_over_time(up{host="raspberrypi", job="integrations/unix"}[3m]) or
+                absent_over_time(up{host="parents_pi", job="integrations/unix"}[3m]) or
+                absent_over_time(up{host="strato_vps", job="integrations/unix"}[3m])
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+
+  # ===========================================================================
+  # 2. Festplatten & Speicher (Storage)
+  # ===========================================================================
+  - orgId: 1
+    name: storage-checks
+    folder: Homelab Alerts
+    interval: 1m
+    rules:
+      - uid: drive_not_mounted
+        title: Externe Festplatte nicht gemountet (nofail-Schutz)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: critical
+        annotations:
+          summary: "💾 Festplatte {{ $labels.mountpoint }} auf {{ $labels.host }} ist NICHT gemountet!"
+          description: "Der erwartete Mountpoint {{ $labels.mountpoint }} fehlt auf {{ $labels.host }} (obwohl der Host online ist). Achtung: Durch 'nofail' in /etc/fstab könnten Dienste sonst auf die SD-Karte schreiben!"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (
+                  absent_over_time(node_filesystem_size_bytes{host="raspberrypi", mountpoint="/mnt/drive"}[2m]) or
+                  absent_over_time(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/mediahdd"}[2m]) or
+                  absent_over_time(node_filesystem_size_bytes{host="parents_pi", mountpoint="/mnt/oldhdd"}[2m])
+                )
+                and on(host) (max by(host) (last_over_time(up{job="integrations/unix"}[2m])) == 1)
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+
+      - uid: filesystem_io_or_ro
+        title: Festplatte Read-Only oder Schreib-/Lesefehler (I/O-Error)
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: critical
+        annotations:
+          summary: "💾 Dateisystem-Fehler auf {{ $labels.host }} ({{ $labels.mountpoint }})"
+          description: "Das Dateisystem {{ $labels.mountpoint }} auf {{ $labels.host }} meldet einen I/O-Error oder wurde vom Kernel wegen Schreibfehlern in den Read-Only-Notbetrieb geschaltet."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host, mountpoint) (
+                  node_filesystem_readonly{mountpoint=~"/|/mnt/.*"} == 1
+                  or
+                  node_filesystem_device_error{mountpoint=~"/|/mnt/.*"} > 0
+                )
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+
+      - uid: smartctl_hardware_error
+        title: S.M.A.R.T. Hardware-Fehler oder defekte Sektoren
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: critical
+        annotations:
+          summary: "💾 S.M.A.R.T.-Warnung für Laufwerk {{ $labels.device }} auf {{ $labels.host }}"
+          description: "smartctl meldet einen fehlgeschlagenen S.M.A.R.T.-Selbsttest oder defekte/schwebende Sektoren (Reallocated / Pending / Uncorrectable) auf {{ $labels.host }} (Device: {{ $labels.device }})."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host, device) (
+                  (smartctl_device_smart_status == 0)
+                  or
+                  (smartctl_device_attribute_raw_value{attribute_name=~"Reallocated_Sector_Ct|Current_Pending_Sector|Offline_Uncorrectable"} > 0)
+                )
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [-1]
+              refId: C
+
+      - uid: smartctl_high_temp
+        title: Festplatten-Temperatur zu hoch (> 55 °C)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: warning
+        annotations:
+          summary: "🌡️ Hohe Festplatten-Temperatur auf {{ $labels.host }} ({{ $labels.device }})"
+          description: "Das Laufwerk {{ $labels.device }} auf {{ $labels.host }} hat eine Temperatur von über 55 °C erreicht."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host, device) (smartctl_device_temperature{temperature_type="current"})
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [55]
+              refId: C
+
+      - uid: disk_space_warning
+        title: Speicherplatz knapp (> 85 %)
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: warning
+        annotations:
+          summary: "⚠️ Speicherplatz auf {{ $labels.host }} ({{ $labels.mountpoint }}) über 85 %"
+          description: "Das Dateisystem {{ $labels.mountpoint }} auf {{ $labels.host }} ist zu mehr als 85 % belegt."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host, mountpoint) (
+                  100 - ((node_filesystem_avail_bytes{mountpoint=~"/|/mnt/.*"} / node_filesystem_size_bytes{mountpoint=~"/|/mnt/.*"}) * 100)
+                )
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+              refId: C
+
+      - uid: disk_space_critical
+        title: Speicherplatz kritisch (> 95 %)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: storage
+          severity: critical
+        annotations:
+          summary: "🚨 Speicherplatz kritisch auf {{ $labels.host }} ({{ $labels.mountpoint }}) über 95 %!"
+          description: "Das Dateisystem {{ $labels.mountpoint }} auf {{ $labels.host }} ist zu mehr als 95 % voll (< 5 % frei)."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host, mountpoint) (
+                  100 - ((node_filesystem_avail_bytes{mountpoint=~"/|/mnt/.*"} / node_filesystem_size_bytes{mountpoint=~"/|/mnt/.*"}) * 100)
+                )
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [95]
+              refId: C
+
+  # ===========================================================================
+  # 3. Docker-Dienste (Container Soll-Listen-Prüfung)
+  # ===========================================================================
+  - orgId: 1
+    name: docker-checks
+    folder: Homelab Alerts
+    interval: 1m
+    rules:
+      - uid: docker_container_down
+        title: Docker-Dienst läuft nicht
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: docker
+          severity: critical
+        annotations:
+          summary: "🐳 Container '{{ $labels.name }}' auf {{ $labels.host }} läuft nicht!"
+          description: "Der Pflicht-Container '{{ $labels.name }}' auf {{ $labels.host }} ist seit mindestens 3 Minuten gestoppt, abgestürzt oder fehlt."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (
+                  absent_over_time(container_last_seen{host="raspberrypi", name="adguard"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="twingate-connector"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless-db"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="paperless-redis"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="scanserver"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="samba"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="alloy"}[2m]) or
+                  absent_over_time(container_last_seen{host="raspberrypi", name="smartctl-exporter"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="adguard"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="twingate-connector"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="plex"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="overseerr"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="samba"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="alloy"}[2m]) or
+                  absent_over_time(container_last_seen{host="parents_pi", name="smartctl-exporter"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="nginx-proxy-manager"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="prometheus"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="grafana"}[2m]) or
+                  absent_over_time(container_last_seen{host="strato_vps", name="alloy"}[2m])
+                )
+                and on(host) (max by(host) (last_over_time(up{job="integrations/unix"}[2m])) == 1)
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+
+  # ===========================================================================
+  # 4. System-Ressourcen (RAM)
+  # ===========================================================================
+  - orgId: 1
+    name: system-checks
+    folder: Homelab Alerts
+    interval: 1m
+    rules:
+      - uid: high_memory_usage
+        title: Hohe RAM-Auslastung (> 90 %)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          category: system
+          severity: warning
+        annotations:
+          summary: "🧠 Hohe RAM-Auslastung auf {{ $labels.host }} (> 90 %)"
+          description: "Der Arbeitsspeicher auf {{ $labels.host }} ist seit über 10 Minuten zu mehr als 90 % ausgelastet."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                max by(host) ((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100)
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [90]
+              refId: C

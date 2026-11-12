@@ -10,8 +10,8 @@ Modular, topic-based Docker Compose configurations deployed to `/opt/services` a
   - Runs: `connectivity/adguard.yml`, `connectivity/proxy.yml`, `connectivity/twingate.yml`, `documents/docker-compose.yml`, `storage/samba.yml`, `monitoring/agent.yml`
 - **`parents_pi`** (`192.168.178.46` — Off-site Pi at parents' house with external drives `/mnt/mediahdd` and `/mnt/oldhdd`):
   - Runs: `connectivity/adguard.yml`, `connectivity/proxy.yml`, `connectivity/twingate.yml`, `media/docker-compose.yml`, `storage/samba.yml`, `monitoring/agent.yml`
-- **`strato_vps`** (`217.154.166.48` — Public Ubuntu VPS, future monitoring server):
-  - Runs: `connectivity/twingate.yml` (and future `monitoring/server.yml`)
+- **`strato_vps`** (`217.154.166.48` — Public Ubuntu VPS, central monitoring server):
+  - Runs: `connectivity/proxy.yml`, `monitoring/server.yml`
 
 Each host subscribes only to the specific Compose files listed in its `compose_files` variable inside `raspi-ansible` (`inventory/host_vars/<hostname>/vars.yml`).
 

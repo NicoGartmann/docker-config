@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
   paperless:
-    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.4.2
     container_name: paperless
     depends_on:
       - paperless-redis

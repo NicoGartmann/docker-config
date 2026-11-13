@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
 
   paperless-db:
-    image: postgres:15.20
+    image: postgres:18.7
     container_name: paperless-db
     environment:
       POSTGRES_DB: paperless

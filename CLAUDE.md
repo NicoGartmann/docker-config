@@ -52,7 +52,7 @@ docker compose --env-file /opt/services/.env -f connectivity/adguard.yml up -d
 3. **`.env`, `.env.example`, and Variable Fallbacks**:
    - **Never commit `.env` or secrets to Git**. `.env` is ignored via `.gitignore` so that `git pull` (`force: true`) during `raspi-ansible` updates never overwrites host-specific paths or Ansible Vault secrets in `/opt/services/.env`.
    - Whenever you introduce a new environment variable in any Compose file, document it in `.env.example` and `README.md`.
-   - Use `${VAR:-/default/path}` fallbacks in Compose files for non-secret paths and ports, and `${VAR}` (without plaintext secret defaults) for sensitive credentials (`TWINGATE_ACCESS_TOKEN`, `TWINGATE_REFRESH_TOKEN`, `SAMBA_PASSWORD`) injected per host via `raspi-ansible` Vaults (`vaults/<hostname>.yml`).
+   - Use `${VAR:-/default/path}` fallbacks in Compose files for non-secret paths and ports, and `${VAR}` (without plaintext secret defaults) for sensitive credentials (`TWINGATE_ACCESS_TOKEN`, `TWINGATE_REFRESH_TOKEN`, `SAMBA_PASSWORD`, `PAPERLESS_SECRET_KEY`) injected per host via `raspi-ansible` Vaults (`vaults/<hostname>.yml`).
 
 4. **Storage Paths & Production Data Protection**:
    - **App Configurations (`/opt/<service>`)**: All service configuration directories reside outside the Git repository under `/opt/<service>` (e.g., `/opt/adguard`, `/opt/nginx-proxy-manager`, `/opt/plex`, `/opt/overseerr`). Never commit runtime data directories or `.gitkeep` placeholders into this repository.

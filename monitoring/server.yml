@@ -2,7 +2,7 @@ name: monitoring-server
 
 services:
   prometheus:
-    image: prom/prometheus:v3.2.1
+    image: prom/prometheus:v3.16.0
     container_name: prometheus
     restart: unless-stopped
     command:

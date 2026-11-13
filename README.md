@@ -9,6 +9,7 @@ Zentrales Repository für alle Docker-Compose-Definitionen der Homelab- & VPS-In
 ```text
 .
 ├── .env.example                             # Vorlage für Pfad- und Secret-Variablen
+├── renovate.json                            # Renovate-Konfiguration (erbt aus NicoGartmann/renovate)
 ├── connectivity/
 │   ├── adguard.yml                          # AdGuard Home (DNS & WebUI)
 │   ├── proxy.yml                            # Nginx Proxy Manager (Reverse Proxy)
@@ -65,3 +66,12 @@ docker compose --env-file /opt/services/.env -f connectivity/adguard.yml up -d
 Im regulären Betrieb übernimmt [`raspi-ansible`](https://github.com/NicoGartmann/raspi-ansible) das Ausrollen und Aktualisieren automatisch über:
 * `ansible-playbook playbooks/docker-compose.yml --ask-vault-pass` (Erst-Setup & `.env`-Aktualisierung)
 * `ansible-playbook playbooks/update.yml` (Alltags-Updates ohne Vault-Passwort)
+
+---
+
+## 4. Automatisierte Image-Updates (Renovate)
+
+Alle gepinnten Container-Images werden einmal wöchentlich (montags um 06:00 Uhr) durch den zentralen Renovate-Runner aus [`NicoGartmann/renovate`](https://github.com/NicoGartmann/renovate) auf neue stabile Releases geprüft:
+* Die lokale [`renovate.json`](./renovate.json) bindet das zentrale Preset `github>NicoGartmann/renovate//presets/docker-compose.json` ein.
+* Pro aktualisiertem Image wird ein separater Pull Request erstellt (mit automatischem Warn-Label `database-major-upgrade` bei Major-Versionssprüngen von `postgres` oder `redis`).
+* Das eigene Rolling-Image `ghcr.io/nicogartmann/scanner-webui:main` (`pull_policy: always`) ist explizit von Renovate ausgenommen.

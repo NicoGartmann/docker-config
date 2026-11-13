@@ -43,10 +43,11 @@ docker compose --env-file /opt/services/.env -f connectivity/adguard.yml up -d
    - Every Compose file **must** declare a unique top-level `name: <stack-name>` attribute (e.g., `name: adguard`, `name: proxy`, `name: twingate`). Because multiple YAML files share directories like `connectivity/`, omitting `name:` would cause Docker Compose to default all of them to the directory name (`connectivity`) and clash on project state.
    - Never add the obsolete `version: "3.x"` attribute.
 
-2. **Image Version Pinning**:
-   - Pin all images to **explicit, official stable release versions** (e.g., `adguard/adguardhome:v0.107.77`, `twingate/connector:1.95.0`, `lscr.io/linuxserver/plex:1.43.5`).
+2. **Image Version Pinning & Automated Updates (`renovate.json`)**:
+   - Pin all images to **explicit, official stable release versions** (e.g., `adguard/adguardhome:v0.107.77`, `twingate/connector:1.95.0`, `lscr.io/linuxserver/plex:1.43.5`, `postgres:15.12`, `redis:7.4.2`).
    - Do **not** use `:latest` for application containers (exception: custom rolling images like `ghcr.io/nicogartmann/scanner-webui:main`) and do **not** use pre-release / release-candidate (`-rc`) tags.
    - *Note*: On `ghcr.io/servercontainers/samba`, the `-r0` suffix in `smbd-only-a3.24.1-s4.23.8-r0` denotes the stable Alpine Linux APK package revision (`a` = Alpine version, `s` = Samba version, `r0` = package build 0), not a release candidate.
+   - Image updates are tracked via [`NicoGartmann/renovate`](https://github.com/NicoGartmann/renovate) and configured in `renovate.json` (which matches all top-level `.yml` Compose files under `connectivity/`, `documents/`, `media/`, `storage/`, and `monitoring/`). Whenever a new topic directory is added, include it in `docker-compose.managerFilePatterns` inside `renovate.json`.
 
 3. **`.env`, `.env.example`, and Variable Fallbacks**:
    - **Never commit `.env` or secrets to Git**. `.env` is ignored via `.gitignore` so that `git pull` (`force: true`) during `raspi-ansible` updates never overwrites host-specific paths or Ansible Vault secrets in `/opt/services/.env`.

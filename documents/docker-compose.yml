@@ -2,7 +2,7 @@ name: documents
 
 services:
   paperless-redis:
-    image: redis:7.4.12
+    image: redis:8.10.3
     container_name: paperless-redis
     restart: unless-stopped
 

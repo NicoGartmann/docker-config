@@ -7,14 +7,14 @@ services:
     restart: unless-stopped
 
   paperless-db:
-    image: postgres:15.20
+    image: postgres:18.7
     container_name: paperless-db
     environment:
       POSTGRES_DB: paperless
       POSTGRES_USER: paperless
       POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD:-paperless}
     volumes:
-      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/pgdata:/var/lib/postgresql/data"
+      - "${PAPERLESS_DATA:-/mnt/drive/paperless}/pgdata:/var/lib/postgresql"
     restart: unless-stopped
 
   paperless:
